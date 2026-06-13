@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './index.css';
+import { db } from './firebase.js';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 
 // --- FIGMA VECTOR ASSET IMPORTS ---
 import RoofSVG from './assets/roof.svg';
@@ -38,7 +40,6 @@ const STATUS_BUTTONS = [
   { id: 'out', label: 'Out of Office', icon: '🚙' }
 ];
 
-// --- UPDATED ROOM TASKS ---
 const ROOM_TASKS = {
   painting: ['I\'m painting', 'I\'m mixing colors', 'I\'m stretching canvases', 'I\'m working on my website', 'I\'m posting my painting', 'I\'m packing orders'],
   pattern: ['I\'m designing patterns', 'I\'m pitching my portfolio', 'I\'m sending email to vendors', 'I\'m designing on illustrator', 'I\'m choosing color combinations', 'I\'m creating mock-ups'],
@@ -47,10 +48,12 @@ const ROOM_TASKS = {
   out: ['I\'m on my way to the store', 'I\'m on my way to Savannah', 'I\'m picking up studio supplies', 'I\'m on my way to the gym', 'I\'m running errands', 'I\'m on my way to Jacksonville', 'I\'m on the road']
 };
 
+const STATUS_DOC = doc(db, 'status', 'current');
+
 export default function DollhouseApp() {
   const [isOwner, setIsOwner] = useState(false);
-  const [currentStatus, setCurrentStatus] = useState(() => localStorage.getItem('cata_status') || 'painting');
-  const [customTaskText, setCustomTaskText] = useState(() => localStorage.getItem('cata_task') || 'I\'m painting');
+  const [currentStatus, setCurrentStatus] = useState('painting');
+  const [customTaskText, setCustomTaskText] = useState('I\'m painting');
   const [carDriving, setCarDriving] = useState(false);
   const [pigeonFlying, setPigeonFlying] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -63,15 +66,28 @@ export default function DollhouseApp() {
   const [paintTubes, setPaintTubes] = useState([{ id: 1, src: PaintTube1, x: 0, y: 0 }, { id: 2, src: PaintTube2, x: 0, y: 0 }, { id: 3, src: PaintTube3, x: 0, y: 0 }]);
   const [dragInfo, setDragInfo] = useState({ id: null, type: null, startX: 0, startY: 0, initialX: 0, initialY: 0 });
 
+  // Clock
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  // Listen to Firebase in real time — all visitors stay in sync
   useEffect(() => {
-    localStorage.setItem('cata_status', currentStatus);
-    localStorage.setItem('cata_task', customTaskText);
-  }, [currentStatus, customTaskText]);
+    const unsubscribe = onSnapshot(STATUS_DOC, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setCurrentStatus(data.status || 'painting');
+        setCustomTaskText(data.task || 'I\'m painting');
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Save to Firebase whenever owner changes status or task
+  const saveToFirebase = async (status, task) => {
+    await setDoc(STATUS_DOC, { status, task });
+  };
 
   const formatTime = (date) => date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
@@ -81,9 +97,16 @@ export default function DollhouseApp() {
   };
 
   const handleStatusChange = (statusId) => {
-    setCurrentStatus(statusId);
     const tasks = ROOM_TASKS[statusId];
-    setCustomTaskText(tasks[Math.floor(Math.random() * tasks.length)]);
+    const newTask = tasks[Math.floor(Math.random() * tasks.length)];
+    setCurrentStatus(statusId);
+    setCustomTaskText(newTask);
+    saveToFirebase(statusId, newTask);
+  };
+
+  const handleTaskTextChange = (e) => {
+    setCustomTaskText(e.target.value);
+    saveToFirebase(currentStatus, e.target.value);
   };
 
   const triggerCarAnimation = () => { if (carDriving || currentStatus === 'out') return; setCarDriving(true); setTimeout(() => setCarDriving(false), 2500); };
@@ -117,7 +140,7 @@ export default function DollhouseApp() {
           <div className="flex items-center justify-center gap-2 mt-1 relative z-10 w-full">
             <span className="text-lg">{STATUS_BUTTONS.find(b => b.id === currentStatus)?.icon}</span>
             {isOwner ? (
-              <input type="text" value={customTaskText} onChange={(e) => setCustomTaskText(e.target.value)} className="text-sm font-bold text-slate-800 bg-transparent border-b border-dashed border-slate-400 text-center focus:outline-none focus:border-amber-500 pb-0.5 px-2 w-56" />
+              <input type="text" value={customTaskText} onChange={handleTaskTextChange} className="text-sm font-bold text-slate-800 bg-transparent border-b border-dashed border-slate-400 text-center focus:outline-none focus:border-amber-500 pb-0.5 px-2 w-56" />
             ) : (
               <p className="text-sm font-bold text-slate-800 px-2 w-56 text-center">{customTaskText}</p>
             )}
