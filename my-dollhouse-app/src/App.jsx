@@ -53,7 +53,7 @@ const STATUS_DOC = doc(db, 'status', 'current');
 export default function DollhouseApp() {
   const [isOwner, setIsOwner] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(null);
-const [customTaskText, setCustomTaskText] = useState(null);
+  const [customTaskText, setCustomTaskText] = useState(null);
   const [carDriving, setCarDriving] = useState(false);
   const [pigeonFlying, setPigeonFlying] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -65,6 +65,9 @@ const [customTaskText, setCustomTaskText] = useState(null);
   const [books, setBooks] = useState([{ id: 1, src: Book1, x: 0, y: 0 }, { id: 2, src: Book2, x: 0, y: 0 }, { id: 3, src: Book3, x: 0, y: 0 }]);
   const [paintTubes, setPaintTubes] = useState([{ id: 1, src: PaintTube1, x: 0, y: 0 }, { id: 2, src: PaintTube2, x: 0, y: 0 }, { id: 3, src: PaintTube3, x: 0, y: 0 }]);
   const [dragInfo, setDragInfo] = useState({ id: null, type: null, startX: 0, startY: 0, initialX: 0, initialY: 0 });
+
+  // ⭐ NEW: star explosion state
+  const [explosions, setExplosions] = useState([]);
 
   // Clock
   useEffect(() => {
@@ -120,7 +123,20 @@ const [customTaskText, setCustomTaskText] = useState(null);
       else if (dragInfo.type === 'tube') setPaintTubes(prev => prev.map(t => t.id === dragInfo.id ? { ...t, x: dragInfo.initialX + dx, y: dragInfo.initialY + dy } : t));
     }
   };
-  const handlePointerUp = (e) => { if (dragInfo.id !== null) { e.target.releasePointerCapture(e.pointerId); setDragInfo({ id: null, type: null, startX: 0, startY: 0, initialX: 0, initialY: 0 }); } };
+
+  // ⭐ UPDATED: handlePointerUp now triggers star explosion
+  const handlePointerUp = (e) => {
+    if (dragInfo.id !== null) {
+      e.target.releasePointerCapture(e.pointerId);
+
+      // Trigger star explosion at drop position
+      const id = Date.now();
+      setExplosions(prev => [...prev, { id, x: e.clientX, y: e.clientY }]);
+      setTimeout(() => setExplosions(prev => prev.filter(ex => ex.id !== id)), 700);
+
+      setDragInfo({ id: null, type: null, startX: 0, startY: 0, initialX: 0, initialY: 0 });
+    }
+  };
 
   return (
     <div className="min-h-screen w-full bg-[#a1dae1] text-slate-800 font-sans flex flex-col items-center justify-between p-4 selection:bg-amber-200 overflow-x-hidden relative max-w-[420px] mx-auto">
@@ -158,7 +174,7 @@ const [customTaskText, setCustomTaskText] = useState(null);
           <div className="w-full relative flex items-end overflow-hidden select-none">
             <img src={PaintingFloorSVG} alt="Painting Floor" className="w-full h-auto block pointer-events-none" />
             {currentStatus === 'painting' && (
-              <div className="absolute bottom-[5%] left-[43%] w-20 z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite] drop-shadow-md">
+              <div className="absolute bottom-[5%] left-[43%] w-[18%] z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite] drop-shadow-md">
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white border border-amber-0 text-amber-700 text-[10px] font-bold px-3 py-1 rounded-full shadow-md whitespace-nowrap">
                   {customTaskText}<div className="w-2 h-2 bg-white border-b border-r border-amber-0 transform rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2"></div>
                 </div><img src={Cata3} alt="Cata Painting" className="w-full h-auto block" />
@@ -170,7 +186,7 @@ const [customTaskText, setCustomTaskText] = useState(null);
           <div className="w-full relative flex items-end select-none">
             <img src={PatternFloorSVG} alt="Pattern Design Floor" className="w-full h-auto block pointer-events-none" />
             {(currentStatus === 'pattern' || currentStatus === 'coffee') && (
-              <div className={`absolute bottom-[10%] ${currentStatus === 'coffee' ? 'left-[58%]' : 'left-[62%]'} w-24 z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite] drop-shadow-md transition-all duration-500`}>
+              <div className={`absolute bottom-[10%] ${currentStatus === 'coffee' ? 'left-[58%]' : 'left-[62%]'} w-[22%] z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite] drop-shadow-md transition-all duration-500`}>
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white border border-amber-0 text-amber-700 text-[10px] font-bold px-3 py-1 rounded-full shadow-md whitespace-nowrap">
                   {customTaskText}<div className="w-2 h-2 bg-white border-b border-r border-amber-0 transform rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2"></div>
                 </div><img src={Cata2} alt="Cata Pattern" className="w-full h-auto block" />
@@ -188,7 +204,7 @@ const [customTaskText, setCustomTaskText] = useState(null);
           <div className="w-full relative flex items-end overflow-hidden select-none">
             <img src={CallFloorSVG} alt="Live Call Floor" className="w-full h-auto block pointer-events-none" />
             {currentStatus === 'call' && (
-              <div className="absolute bottom-[10%] left-[51%] w-20 z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite] drop-shadow-md">
+              <div className="absolute bottom-[10%] left-[51%] w-[18%] z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite] drop-shadow-md">
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white border border-amber-0 text-amber-700 text-[10px] font-bold px-3 py-1 rounded-full shadow-md whitespace-nowrap">
                   {customTaskText}<div className="w-2 h-2 bg-white border-b border-r border-amber-0 transform rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2"></div>
                 </div><img src={Cata1} alt="Cata Calling" className="w-full h-auto block" />
@@ -209,6 +225,27 @@ const [customTaskText, setCustomTaskText] = useState(null);
           </div>
         </div>
       </div>
+
+      {/* ⭐ NEW: Star explosions rendered here */}
+      {explosions.map(ex => (
+        <div key={ex.id} className="fixed pointer-events-none z-[999]" style={{ left: ex.x, top: ex.y }}>
+          {["✦","✧","★","✦","✧","★","✦","✧"].map((s, i) => {
+            const angle = (i / 8) * 360;
+            const dist = 35 + Math.random() * 20;
+            const dx = Math.cos((angle * Math.PI) / 180) * dist;
+            const dy = Math.sin((angle * Math.PI) / 180) * dist;
+            return (
+              <span
+                key={i}
+                className="absolute text-amber-400 text-sm animate-[starBurst_0.6s_ease-out_forwards]"
+                style={{ "--dx": `${dx}px`, "--dy": `${dy}px` }}
+              >
+                {s}
+              </span>
+            );
+          })}
+        </div>
+      ))}
 
       {isOwner && (
         <footer className="fixed bottom-6 w-full max-w-sm mx-auto z-50 animate-[popIn_0.3s_ease-out_forwards]">
@@ -242,6 +279,10 @@ const [customTaskText, setCustomTaskText] = useState(null);
         @keyframes pigeonFlyAway { 0% { bottom: 20%; transform: scale(1) translateY(0); opacity: 1; } 40% { bottom: 110%; transform: scale(0.4) translateY(-100px); opacity: 0; } 100% { bottom: 15%; transform: scale(1); opacity: 1; } }
         @keyframes mothFlight { 0%, 20% { top: 16%; left: 81%; transform: rotate(0deg); } 28% { top: 30%; left: 60%; transform: rotate(-25deg); } 33% { top: 38%; left: 45%; transform: rotate(15deg); } 38% { top: 42%; left: 25%; transform: rotate(-20deg); } 40%, 58% { top: 48%; left: 7%; transform: rotate(0deg); } 65% { top: 55%; left: 25%; transform: rotate(20deg); } 70% { top: 62%; left: 50%; transform: rotate(-15deg); } 75% { top: 68%; left: 68%; transform: rotate(10deg); } 80%, 100% { top: 72%; left: 78%; transform: rotate(0deg); } }
         @keyframes mothFlap { 0%, 33.3% { content: url(${MothA}); } 34.5% { content: url(${MothB}); } 35.5% { content: url(${MothA}); } 40%, 66.6% { content: url(${MothA}); } 67.5% { content: url(${MothB}); } 68.5% { content: url(${MothA}); } 73.3%, 100% { content: url(${MothA}); } }
+        @keyframes starBurst { 
+          0% { transform: translate(0, 0) scale(1); opacity: 1; } 
+          100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; } 
+        }
       `}</style>
     </div>
   );
