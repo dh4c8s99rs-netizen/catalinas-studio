@@ -20,6 +20,7 @@ import Book3 from './assets/books3.svg';
 import PaintTube1 from './assets/paint-tube1.svg';
 import PaintTube2 from './assets/paint-tube2.svg';
 import PaintTube3 from './assets/paint-tube3.svg';
+import PopupSVG from './assets/popup.svg';
 
 // --- INTERACTIVE ASSET IMPORTS ---
 import ToDoListSVG from './assets/to-do-list.svg';
@@ -61,6 +62,7 @@ export default function DollhouseApp() {
   const [isToDoOpen, setIsToDoOpen] = useState(false);
   const [hoverCup, setHoverCup] = useState(false);
   const [secretKnocks, setSecretKnocks] = useState(0);
+  const [showPopup, setShowPopup] = useState(true);
 
   const [books, setBooks] = useState([{ id: 1, src: Book1, x: 0, y: 0 }, { id: 2, src: Book2, x: 0, y: 0 }, { id: 3, src: Book3, x: 0, y: 0 }]);
   const [paintTubes, setPaintTubes] = useState([{ id: 1, src: PaintTube1, x: 0, y: 0 }, { id: 2, src: PaintTube2, x: 0, y: 0 }, { id: 3, src: PaintTube3, x: 0, y: 0 }]);
@@ -141,10 +143,20 @@ export default function DollhouseApp() {
   return (
     <div className="min-h-screen w-full bg-[#a1dae1] text-slate-800 font-sans flex flex-col items-center justify-between p-4 selection:bg-amber-200 overflow-x-hidden relative max-w-[420px] mx-auto">
       {isToDoOpen && (
+        
         <div onClick={() => setIsToDoOpen(false)} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm" style={{ cursor: `url(${PencilSVG}) 0 32, auto` }}>
           <div className="relative animate-[popIn_0.3s_ease-out_forwards]" onClick={(e) => e.stopPropagation()} style={{ cursor: `url(${PencilSVG}) 0 32, auto` }}>
             <img src={ToDoListSVG} alt="Large To-Do List" className="w-72 md:w-96 h-auto shadow-2xl drop-shadow-xl" style={{ cursor: `url(${PencilSVG}) 0 32, auto` }} />
             <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-white font-medium text-xs tracking-widest uppercase opacity-80 pointer-events-none">Click anywhere to close</span>
+          </div>
+        </div>
+      )}
+
+      {showPopup && (
+        <div onClick={() => setShowPopup(false)} className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="relative animate-[popIn_0.3s_ease-out_forwards]" onClick={(e) => e.stopPropagation()}>
+            <img src={PopupSVG} alt="Welcome Popup" onClick={() => setShowPopup(false)} className="w-72 md:w-96 h-auto shadow-2xl drop-shadow-xl cursor-pointer" />
+            <button onClick={() => setShowPopup(false)} className="absolute -top-3 -right-3 bg-white rounded-full w-7 h-7 flex items-center justify-center shadow-md text-slate-500 font-bold text-sm hover:scale-110 transition-transform">✕</button>
           </div>
         </div>
       )}
@@ -154,7 +166,7 @@ export default function DollhouseApp() {
           <img src={CloudSVG} alt="Cloud Background" draggable={false} className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[115%] h-auto object-contain -z-10 pointer-events-none" />
           <span onClick={handleSecretKnock} className="text-[10px] font-bold tracking-widest text-slate-500 uppercase cursor-pointer select-none hover:text-slate-700 relative z-10" title="Secret Door">{formatTime(currentTime)} currently</span>
           <div className="flex items-center justify-center gap-2 mt-1 relative z-10 w-full">
-            <span className="text-lg">{STATUS_BUTTONS.find(b => b.id === currentStatus)?.icon}</span>
+          
             {isOwner ? (
               <input type="text" value={customTaskText} onChange={handleTaskTextChange} className="text-sm font-bold text-slate-800 bg-transparent border-b border-dashed border-slate-400 text-center focus:outline-none focus:border-amber-500 pb-0.5 px-2 w-56" />
             ) : (
@@ -174,19 +186,19 @@ export default function DollhouseApp() {
           <div className="w-full relative flex items-end overflow-hidden select-none">
             <img src={PaintingFloorSVG} alt="Painting Floor" className="w-full h-auto block pointer-events-none" />
             {currentStatus === 'painting' && (
-              <div className="absolute bottom-[5%] left-[43%] w-[18%] z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite] drop-shadow-md">
+              <div className="absolute bottom-[5%] left-[43%] w-[22%] z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite] drop-shadow-md">
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white border border-amber-0 text-amber-700 text-[10px] font-bold px-3 py-1 rounded-full shadow-md whitespace-nowrap">
                   {customTaskText}<div className="w-2 h-2 bg-white border-b border-r border-amber-0 transform rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2"></div>
                 </div><img src={Cata3} alt="Cata Painting" className="w-full h-auto block" />
               </div>
             )}
-            {paintTubes.map((tube, index) => (<img key={`tube-${tube.id}`} src={tube.src} draggable={false} onPointerDown={(e) => handlePointerDown(e, tube, 'tube')} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp} style={{ transform: `translate(${tube.x}px, ${tube.y}px)`, touchAction: 'none' }} className={`absolute w-8 cursor-grab active:cursor-grabbing bottom-[15%] left-[${25 + (index * 15)}%] ${dragInfo.id === tube.id && dragInfo.type === 'tube' ? 'z-50 scale-110 duration-0' : 'z-30 duration-300 hover:scale-105'}`} />))}
+            {paintTubes.map((tube, index) => (<img key={`tube-${tube.id}`} src={tube.src} draggable={false} onPointerDown={(e) => handlePointerDown(e, tube, 'tube')} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp} style={{ transform: `translate(${tube.x}px, ${tube.y}px)`, touchAction: 'none' }} className={`absolute w-8 cursor-grab active:cursor-grabbing bottom-[10%] left-[${9 + (index * 15)}%] ${dragInfo.id === tube.id && dragInfo.type === 'tube' ? 'z-50 scale-110 duration-0' : 'z-30 duration-300 hover:scale-105'}`} />))}
           </div>
           <img src={FloorSVG} alt="Floor Divider" className="w-full h-auto block" />
           <div className="w-full relative flex items-end select-none">
             <img src={PatternFloorSVG} alt="Pattern Design Floor" className="w-full h-auto block pointer-events-none" />
             {(currentStatus === 'pattern' || currentStatus === 'coffee') && (
-              <div className={`absolute bottom-[10%] ${currentStatus === 'coffee' ? 'left-[58%]' : 'left-[62%]'} w-[22%] z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite] drop-shadow-md transition-all duration-500`}>
+              <div className={`absolute bottom-[10%] ${currentStatus === 'coffee' ? 'left-[58%]' : 'left-[62%]'} w-[26%] z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite] drop-shadow-md transition-all duration-500`}>
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white border border-amber-0 text-amber-700 text-[10px] font-bold px-3 py-1 rounded-full shadow-md whitespace-nowrap">
                   {customTaskText}<div className="w-2 h-2 bg-white border-b border-r border-amber-0 transform rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2"></div>
                 </div><img src={Cata2} alt="Cata Pattern" className="w-full h-auto block" />
@@ -204,13 +216,13 @@ export default function DollhouseApp() {
           <div className="w-full relative flex items-end overflow-hidden select-none">
             <img src={CallFloorSVG} alt="Live Call Floor" className="w-full h-auto block pointer-events-none" />
             {currentStatus === 'call' && (
-              <div className="absolute bottom-[10%] left-[51%] w-[18%] z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite] drop-shadow-md">
+              <div className="absolute bottom-[10%] left-[51%] w-[22%] z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite] drop-shadow-md">
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white border border-amber-0 text-amber-700 text-[10px] font-bold px-3 py-1 rounded-full shadow-md whitespace-nowrap">
                   {customTaskText}<div className="w-2 h-2 bg-white border-b border-r border-amber-0 transform rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2"></div>
                 </div><img src={Cata1} alt="Cata Calling" className="w-full h-auto block" />
               </div>
             )}
-            {books.map((book, index) => (<img key={`book-${book.id}`} src={book.src} draggable={false} onPointerDown={(e) => handlePointerDown(e, book, 'book')} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp} style={{ transform: `translate(${book.x}px, ${book.y}px)`, touchAction: 'none' }} className={`absolute w-12 cursor-grab active:cursor-grabbing bottom-[15%] left-[${25 + (index * 15)}%] ${dragInfo.id === book.id && dragInfo.type === 'book' ? 'z-50 scale-110 duration-0' : 'z-30 duration-300 hover:scale-105'}`} />))}
+            {books.map((book, index) => (<img key={`book-${book.id}`} src={book.src} draggable={false} onPointerDown={(e) => handlePointerDown(e, book, 'book')} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp} style={{ transform: `translate(${book.x}px, ${book.y}px)`, touchAction: 'none' }} className={`absolute w-12 cursor-grab active:cursor-grabbing bottom-[5%] left-[${8 + (index * 15)}%] ${dragInfo.id === book.id && dragInfo.type === 'book' ? 'z-50 scale-110 duration-0' : 'z-30 duration-300 hover:scale-105'}`} />))}
           </div>
           <div className="w-full relative flex items-end bg-transparent z-40">
             <img src={DrivewaySVG} alt="Driveway" className="w-full h-auto block" />
