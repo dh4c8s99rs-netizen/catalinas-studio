@@ -52,8 +52,8 @@ const STATUS_DOC = doc(db, 'status', 'current');
 
 export default function DollhouseApp() {
   const [isOwner, setIsOwner] = useState(false);
-  const [currentStatus, setCurrentStatus] = useState('painting');
-  const [customTaskText, setCustomTaskText] = useState('I\'m painting');
+  const [currentStatus, setCurrentStatus] = useState(null);
+const [customTaskText, setCustomTaskText] = useState(null);
   const [carDriving, setCarDriving] = useState(false);
   const [pigeonFlying, setPigeonFlying] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
