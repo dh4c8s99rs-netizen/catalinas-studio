@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './index.css';
 import { db } from './firebase.js';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 
 // --- FIGMA VECTOR ASSET IMPORTS ---
 import RoofSVG from './assets/roof.svg';
@@ -24,6 +24,9 @@ import PopupSVG from './assets/popup.svg';
 
 // --- INTERACTIVE ASSET IMPORTS ---
 import ToDoListSVG from './assets/to-do-list.svg';
+import FormSVG from './assets/form.svg';
+import FormWallSVG from './assets/form-wall.svg';
+import ToDoListEmptySVG from './assets/to-do-list-empty.svg';
 import PencilSVG from './assets/pencil.svg';
 import CupSVG from './assets/cup.svg';
 import CloudSVG from './assets/cloud.svg';
@@ -55,9 +58,12 @@ const ROOM_TASKS = {
 };
 
 const STATUS_DOC = doc(db, 'status', 'current');
+const DASHBOARD_DOC = doc(db, 'dashboard', 'patterns');
 
 const EARPHONE_FRAMES = [Earphones1, Earphones3, Earphones2, Earphones3];
 const EARPHONE_DELAYS = [3000, 200, 200, 200];
+
+const COLLECTIONS_TARGET = 12;
 
 export default function DollhouseApp() {
   const [isOwner, setIsOwner] = useState(false);
@@ -67,6 +73,7 @@ export default function DollhouseApp() {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   const [isToDoOpen, setIsToDoOpen] = useState(false);
+  const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
   const [hoverCup, setHoverCup] = useState(false);
   const [secretKnocks, setSecretKnocks] = useState(0);
@@ -74,6 +81,25 @@ export default function DollhouseApp() {
 
   const [pigeons, setPigeons] = useState([]);
   const [earphonesFrame, setEarphonesFrame] = useState(0);
+
+  // Dashboard state
+  const [collections, setCollections] = useState(0);
+  const [portfolioProgress, setPortfolioProgress] = useState(0);
+  const [pitches, setPitches] = useState([
+    { id: 1, name: '', sent: false, response: false },
+    { id: 2, name: '', sent: false, response: false },
+    { id: 3, name: '', sent: false, response: false },
+    { id: 4, name: '', sent: false, response: false },
+    { id: 5, name: '', sent: false, response: false },
+  ]);
+
+  const [callTasks, setCallTasks] = React.useState([
+    { id: 1, task: '', invoiceSent: false, invoicePaid: false },
+    { id: 2, task: '', invoiceSent: false, invoicePaid: false },
+    { id: 3, task: '', invoiceSent: false, invoicePaid: false },
+    { id: 4, task: '', invoiceSent: false, invoicePaid: false },
+    { id: 5, task: '', invoiceSent: false, invoicePaid: false },
+  ]);
 
   const [books, setBooks] = useState([{ id: 1, src: Book1, x: 0, y: 0 }, { id: 2, src: Book2, x: 0, y: 0 }, { id: 3, src: Book3, x: 0, y: 0 }]);
   const [paintTubes, setPaintTubes] = useState([{ id: 1, src: PaintTube1, x: 0, y: 0 }, { id: 2, src: PaintTube2, x: 0, y: 0 }, { id: 3, src: PaintTube3, x: 0, y: 0 }]);
@@ -86,7 +112,7 @@ export default function DollhouseApp() {
     return () => clearInterval(timer);
   }, []);
 
-  // Earphones animation loop
+  // Earphones animation
   useEffect(() => {
     let frame = 0;
     let timeout;
@@ -99,7 +125,7 @@ export default function DollhouseApp() {
     return () => clearTimeout(timeout);
   }, []);
 
-  // Firebase sync
+  // Firebase status sync
   useEffect(() => {
     const unsubscribe = onSnapshot(STATUS_DOC, (snap) => {
       if (snap.exists()) {
@@ -111,6 +137,34 @@ export default function DollhouseApp() {
     return () => unsubscribe();
   }, []);
 
+  // Firebase dashboard sync
+  useEffect(() => {
+    const unsubscribe = onSnapshot(DASHBOARD_DOC, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.collections !== undefined) setCollections(data.collections);
+        if (data.portfolioProgress !== undefined) setPortfolioProgress(data.portfolioProgress);
+        if (data.pitches !== undefined) setPitches(data.pitches);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const saveDashboard = async (updates) => {
+    await setDoc(DASHBOARD_DOC, updates, { merge: true });
+  };
+
+  const CALLTASKS_DOC = doc(db, 'dashboard', 'calltasks');
+  const saveCallTasks = async (tasks) => {
+    await setDoc(CALLTASKS_DOC, { tasks }, { merge: true });
+  };
+
+  const handleCallTaskChange = (id, field, value) => {
+    const updated = callTasks.map(t => t.id === id ? { ...t, [field]: value } : t);
+    setCallTasks(updated);
+    saveCallTasks(updated);
+  };
+
   const saveToFirebase = async (status, task) => {
     await setDoc(STATUS_DOC, { status, task });
   };
@@ -118,8 +172,17 @@ export default function DollhouseApp() {
   const formatTime = (date) => date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
   const handleSecretKnock = () => {
-    if (secretKnocks >= 2) { setIsOwner(!isOwner); setSecretKnocks(0); }
+    if (secretKnocks >= 2) { setIsOwner(prev => !prev); setSecretKnocks(0); }
     else { setSecretKnocks(prev => prev + 1); setTimeout(() => setSecretKnocks(0), 1500); }
+  };
+
+  // Separate 3-knock counter for the notebook
+  const [notebookKnocks, setNotebookKnocks] = React.useState(0);
+  const [formKnocks, setFormKnocks] = React.useState(0);
+  const [isFormDashboardOpen, setIsFormDashboardOpen] = React.useState(false);
+  const handleNotebookKnock = () => {
+    if (notebookKnocks >= 2) { setIsDashboardOpen(true); setNotebookKnocks(0); }
+    else { setNotebookKnocks(prev => prev + 1); setTimeout(() => setNotebookKnocks(0), 1500); }
   };
 
   const handleStatusChange = (statusId) => {
@@ -142,19 +205,41 @@ export default function DollhouseApp() {
   };
 
   const triggerPigeonFlight = () => {
-    const newPigeon = {
-      id: Date.now(),
-      left: `${15 + Math.random() * 60}%`,
-      bottom: `${35 + Math.random() * 15}%`,
-    };
+    const newPigeon = { id: Date.now(), left: `${15 + Math.random() * 60}%`, bottom: `${35 + Math.random() * 15}%` };
     setPigeons(prev => [...prev, newPigeon]);
-    setTimeout(() => {
-      setPigeons(prev => prev.filter(p => p.id !== newPigeon.id));
-    }, 10000);
+    setTimeout(() => setPigeons(prev => prev.filter(p => p.id !== newPigeon.id)), 10000);
+  };
+
+  const handleNotebookClick = () => {
+    if (isOwner) setIsDashboardOpen(true);
+    else setIsToDoOpen(true);
+  };
+
+  const handleCollectionsChange = (val) => {
+    const v = Number(val);
+    setCollections(v);
+    saveDashboard({ collections: v, portfolioProgress, pitches });
+  };
+
+  const handlePortfolioChange = (val) => {
+    const v = Number(val);
+    setPortfolioProgress(v);
+    saveDashboard({ collections, portfolioProgress: v, pitches });
+  };
+
+  const handlePitchChange = (id, field, value) => {
+    const updated = pitches.map(p => p.id === id ? { ...p, [field]: value } : p);
+    setPitches(updated);
+    saveDashboard({ collections, portfolioProgress, pitches: updated });
+  };
+
+  const handleFormKnock = () => {
+    if (formKnocks >= 2) { setIsFormDashboardOpen(true); setFormKnocks(0); }
+    else { setFormKnocks(prev => prev + 1); setTimeout(() => setFormKnocks(0), 1500); }
   };
 
   const handlePointerDown = (e, item, type) => {
-    setDragInfo({ id: item.id, type: type, startX: e.clientX, startY: e.clientY, initialX: item.x, initialY: item.y });
+    setDragInfo({ id: item.id, type, startX: e.clientX, startY: e.clientY, initialX: item.x, initialY: item.y });
     e.target.setPointerCapture(e.pointerId);
   };
 
@@ -180,11 +265,121 @@ export default function DollhouseApp() {
   return (
     <div className="min-h-screen w-full bg-[#a1dae1] text-slate-800 font-sans flex flex-col items-center justify-between p-4 selection:bg-amber-200 overflow-x-hidden relative max-w-[420px] mx-auto">
 
-      {/* TO-DO POPUP */}
+      {/* VISITOR: TO-DO POPUP */}
       {isToDoOpen && (
         <div onClick={() => setIsToDoOpen(false)} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm" style={{ cursor: `url(${PencilSVG}) 0 32, auto` }}>
-          <div className="relative animate-[popIn_0.3s_ease-out_forwards]" onClick={(e) => e.stopPropagation()} style={{ cursor: `url(${PencilSVG}) 0 32, auto` }}>
+          <div className="relative animate-[popIn_0.3s_ease-out_forwards]" onClick={(e) => e.stopPropagation()}>
             <img src={ToDoListSVG} alt="Large To-Do List" className="w-72 md:w-96 h-auto shadow-2xl drop-shadow-xl" />
+            <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-white font-medium text-xs tracking-widest uppercase opacity-80 pointer-events-none">Click anywhere to close</span>
+          </div>
+        </div>
+      )}
+
+      {/* OWNER: SECRET DASHBOARD POPUP */}
+      {isDashboardOpen && (
+        <div onClick={() => setIsDashboardOpen(false)} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="relative animate-[popIn_0.3s_ease-out_forwards]" onClick={(e) => e.stopPropagation()}>
+
+            {/* Notebook background */}
+            <div className="relative w-80">
+              <img src={ToDoListEmptySVG} alt="Notebook" className="w-full h-auto" />
+
+              {/* Dashboard content overlaid on notebook */}
+              <div className="absolute inset-0 flex flex-col justify-start pt-16 px-8 pb-6 gap-5">
+
+                <p className="text-center text-[11px] font-black tracking-widest uppercase text-[#30797f] mb-1">✦ pattern studio ✦</p>
+
+                {/* Collections */}
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[11px] font-bold text-slate-600">brainstorm collections</span>
+                    <span className="text-[11px] font-black text-[#30797f]">{collections}/{COLLECTIONS_TARGET}</span>
+                  </div>
+                  <input
+                    type="range" min="0" max={COLLECTIONS_TARGET} value={collections}
+                    onChange={(e) => handleCollectionsChange(e.target.value)}
+                    className="w-full h-2 rounded-full accent-[#30797f] cursor-pointer"
+                  />
+                </div>
+
+                {/* Portfolio */}
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[11px] font-bold text-slate-600">update portfolio</span>
+                    <span className="text-[11px] font-black text-[#30797f]">{portfolioProgress}%</span>
+                  </div>
+                  <input
+                    type="range" min="0" max="100" value={portfolioProgress}
+                    onChange={(e) => handlePortfolioChange(e.target.value)}
+                    className="w-full h-2 rounded-full accent-[#30797f] cursor-pointer"
+                  />
+                </div>
+
+                {/* Pitches */}
+                <div>
+                  <p className="text-[11px] font-bold text-slate-600 mb-2">pitch to clients</p>
+                  <div className="flex flex-col gap-1.5">
+                    {pitches.map(pitch => (
+                      <div key={pitch.id} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder={`client ${pitch.id}`}
+                          value={pitch.name}
+                          onChange={(e) => handlePitchChange(pitch.id, 'name', e.target.value)}
+                          className="flex-1 text-[10px] bg-transparent border-b border-dashed border-slate-300 focus:outline-none focus:border-[#30797f] placeholder:text-slate-300 text-slate-600 pb-0.5"
+                        />
+                        <button
+                          onClick={() => handlePitchChange(pitch.id, 'sent', !pitch.sent)}
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border transition-all ${pitch.sent ? 'bg-[#30797f] text-white border-[#30797f]' : 'bg-transparent text-slate-400 border-slate-300'}`}
+                        >sent</button>
+                        <button
+                          onClick={() => handlePitchChange(pitch.id, 'response', !pitch.response)}
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border transition-all ${pitch.response ? 'bg-amber-400 text-white border-amber-400' : 'bg-transparent text-slate-400 border-slate-300'}`}
+                        >reply</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <button onClick={() => setIsDashboardOpen(false)} className="absolute -top-3 -right-3 bg-white rounded-full w-7 h-7 flex items-center justify-center shadow-md text-slate-500 font-bold text-sm hover:scale-110 transition-transform">✕</button>
+            <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-white font-medium text-xs tracking-widest uppercase opacity-80 pointer-events-none">Click anywhere to close</span>
+          </div>
+        </div>
+      )}
+
+      {/* OWNER: CALL FLOOR FORM DASHBOARD */}
+      {isFormDashboardOpen && (
+        <div onClick={() => setIsFormDashboardOpen(false)} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="relative animate-[popIn_0.3s_ease-out_forwards]" onClick={(e) => e.stopPropagation()}>
+            <div className="relative w-72">
+              <img src={FormSVG} alt="Form" className="w-full h-auto" />
+              <div className="absolute inset-0 flex flex-col justify-start pt-16 px-7 pb-6 gap-3">
+                <p className="text-center text-[11px] font-black tracking-widest uppercase text-white mb-1">✦ work & invoices ✦</p>
+                {callTasks.map(t => (
+                  <div key={t.id} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder={`task ${t.id}`}
+                      value={t.task}
+                      onChange={(e) => handleCallTaskChange(t.id, 'task', e.target.value)}
+                      className="flex-1 text-[10px] bg-transparent border-b border-dashed border-white/50 focus:outline-none focus:border-white placeholder:text-white/40 text-white pb-0.5"
+                    />
+                    <button
+                      onClick={() => handleCallTaskChange(t.id, 'invoiceSent', !t.invoiceSent)}
+                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border transition-all whitespace-nowrap ${t.invoiceSent ? 'bg-white text-[#27417e] border-white' : 'bg-transparent text-white/60 border-white/40'}`}
+                    >sent</button>
+                    <button
+                      onClick={() => handleCallTaskChange(t.id, 'invoicePaid', !t.invoicePaid)}
+                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border transition-all whitespace-nowrap ${t.invoicePaid ? 'bg-amber-400 text-white border-amber-400' : 'bg-transparent text-white/60 border-white/40'}`}
+                    >paid</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <button onClick={() => setIsFormDashboardOpen(false)} className="absolute -top-3 -right-3 bg-white rounded-full w-7 h-7 flex items-center justify-center shadow-md text-slate-500 font-bold text-sm hover:scale-110 transition-transform">✕</button>
             <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-white font-medium text-xs tracking-widest uppercase opacity-80 pointer-events-none">Click anywhere to close</span>
           </div>
         </div>
@@ -200,16 +395,13 @@ export default function DollhouseApp() {
         </div>
       )}
 
-      {/* SPOTIFY BOTTOM BAR — toggle on/off with earphones */}
+      {/* SPOTIFY BOTTOM BAR */}
       <div className={`fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[420px] z-[60] transition-all duration-500 ease-in-out ${isPlaylistOpen ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}>
         <iframe
           style={{ borderRadius: '0' }}
           src="https://open.spotify.com/embed/playlist/4ZNHyYY9OflnaieQ0JlvUW?utm_source=generator"
-          width="100%"
-          height="80"
-          frameBorder="0"
-          allowFullScreen=""
-          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+          width="100%" height="80" frameBorder="0"
+          allowFullScreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
           loading="lazy"
         />
       </div>
@@ -258,15 +450,12 @@ export default function DollhouseApp() {
                 <img src={Cata3} alt="Cata Painting" className="w-full h-auto block" />
               </div>
             )}
-
-            {/* EARPHONES — toggle playlist bar */}
             <img
               src={EARPHONE_FRAMES[earphonesFrame]}
               alt="Earphones"
               onClick={() => setIsPlaylistOpen(prev => !prev)}
-              className="absolute bottom-[6%] left-[65%] w-10 z-30 cursor-pointer drop-shadow-sm"
+              className="absolute bottom-[8%] left-[65%] w-10 z-30 cursor-pointer drop-shadow-sm"
             />
-
             {paintTubes.map((tube, index) => (
               <img key={`tube-${tube.id}`} src={tube.src} draggable={false}
                 onPointerDown={(e) => handlePointerDown(e, tube, 'tube')}
@@ -290,7 +479,12 @@ export default function DollhouseApp() {
                 <img src={Cata2} alt="Cata Pattern" className="w-full h-auto block" />
               </div>
             )}
-            <img src={ToDoListSVG} alt="Mini To-Do List" onClick={() => setIsToDoOpen(true)} className="absolute top-[8%] left-[21%] w-14 cursor-pointer hover:scale-110 transition-transform duration-300 z-30 drop-shadow-sm" />
+            {/* NOTEBOOK — prop for visitors, dashboard for owner */}
+            <img
+              src={ToDoListSVG} alt="Notebook"
+              onClick={handleNotebookKnock}
+              className="absolute top-[8%] left-[21%] w-14 z-30 drop-shadow-sm cursor-pointer"
+            />
             <div className="absolute bottom-[10%] left-[15.5%] w-8 z-40 cursor-pointer drop-shadow-sm" onMouseEnter={() => setHoverCup(true)} onMouseLeave={() => setHoverCup(false)}>
               <a href="https://buymeacoffee.com/catalinawilliams" target="_blank" rel="noopener noreferrer" className="relative block w-full h-full">
                 <div className={`absolute -top-8 left-1/2 -translate-x-1/2 bg-white text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md whitespace-nowrap transition-all duration-200 pointer-events-none ${hoverCup ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>Buy Cata a coffee</div>
@@ -304,6 +498,12 @@ export default function DollhouseApp() {
           {/* CALL FLOOR */}
           <div className="w-full relative flex items-end overflow-hidden select-none">
             <img src={CallFloorSVG} alt="Live Call Floor" className="w-full h-auto block pointer-events-none" />
+            {/* FORM on wall — 3 knocks opens invoice dashboard */}
+            <img
+              src={FormWallSVG} alt="Form"
+              onClick={handleFormKnock}
+              className="absolute top-[17%] left-[25%] w-14 z-30 cursor-pointer drop-shadow-sm"
+            />
             {currentStatus === 'call' && (
               <div className="absolute bottom-[10%] left-[51%] w-[22%] z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite] drop-shadow-md">
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white text-amber-700 text-[10px] font-bold px-3 py-1 rounded-full shadow-md whitespace-nowrap">
@@ -354,7 +554,7 @@ export default function DollhouseApp() {
       ))}
 
       {isOwner && (
-        <footer className="fixed bottom-0 w-full max-w-sm mx-auto z-50 animate-[popIn_0.3s_ease-out_forwards]" style={{ bottom: isPlaylistOpen ? '80px' : '24px', transition: 'bottom 0.5s ease-in-out' }}>
+        <footer className="fixed w-full max-w-sm mx-auto z-50 animate-[popIn_0.3s_ease-out_forwards]" style={{ bottom: isPlaylistOpen ? '104px' : '24px', transition: 'bottom 0.5s ease-in-out' }}>
           <div className="flex justify-between items-center bg-white/90 backdrop-blur-md p-2 rounded-full shadow-lg border border-slate-200 gap-1 mx-4">
             {STATUS_BUTTONS.map((btn) => {
               const isActive = currentStatus === btn.id;
@@ -388,6 +588,8 @@ export default function DollhouseApp() {
           0% { transform: translate(0, 0) scale(1); opacity: 1; }
           100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
         }
+        input[type='range'] { -webkit-appearance: none; appearance: none; background: #e2e8f0; height: 6px; border-radius: 9999px; }
+        input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #30797f; cursor: pointer; }
       `}</style>
     </div>
   );
