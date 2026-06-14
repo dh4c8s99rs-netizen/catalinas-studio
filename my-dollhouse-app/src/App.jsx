@@ -26,6 +26,16 @@ import PopupSVG from './assets/popup.svg';
 import ToDoListSVG from './assets/to-do-list.svg';
 import FormSVG from './assets/form.svg';
 import FormWallSVG from './assets/form-wall.svg';
+import PaintingWallSVG from './assets/painting-wall.svg';
+import PaintingPopupSVG from './assets/painting-pop-up.svg';
+import Squirrel1 from './assets/squirrel1.svg';
+import Squirrel2 from './assets/squirrel2.svg';
+import AcornSVG from './assets/acorn.svg';
+import Button1 from './assets/button1.svg';
+import Button2 from './assets/button2.svg';
+import Button3 from './assets/button3.svg';
+import Button4 from './assets/button4.svg';
+import Button5 from './assets/button5.svg';
 import ToDoListEmptySVG from './assets/to-do-list-empty.svg';
 import PencilSVG from './assets/pencil.svg';
 import CupSVG from './assets/cup.svg';
@@ -59,6 +69,8 @@ const ROOM_TASKS = {
 
 const STATUS_DOC = doc(db, 'status', 'current');
 const DASHBOARD_DOC = doc(db, 'dashboard', 'patterns');
+const CALLTASKS_DOC = doc(db, 'dashboard', 'calltasks');
+const PAINTINGS_DOC = doc(db, 'dashboard', 'paintings');
 
 const EARPHONE_FRAMES = [Earphones1, Earphones3, Earphones2, Earphones3];
 const EARPHONE_DELAYS = [3000, 200, 200, 200];
@@ -80,6 +92,9 @@ export default function DollhouseApp() {
   const [showPopup, setShowPopup] = useState(true);
 
   const [pigeons, setPigeons] = useState([]);
+  const [squirrelFrame, setSquirrelFrame] = useState(1); // 1 = running, 2 = paused
+  const [squirrelRunning, setSquirrelRunning] = useState(true);
+  const [acornExplosions, setAcornExplosions] = useState([]);
   const [earphonesFrame, setEarphonesFrame] = useState(0);
 
   // Dashboard state
@@ -92,6 +107,8 @@ export default function DollhouseApp() {
     { id: 4, name: '', sent: false, response: false },
     { id: 5, name: '', sent: false, response: false },
   ]);
+
+  const [paintings, setPaintings] = React.useState([]);
 
   const [callTasks, setCallTasks] = React.useState([
     { id: 1, task: '', invoiceSent: false, invoicePaid: false },
@@ -125,6 +142,46 @@ export default function DollhouseApp() {
     return () => clearTimeout(timeout);
   }, []);
 
+  // Squirrel animation loop: run fast, stop, show squirrel2, back to running
+  useEffect(() => {
+    let timeout;
+    const cycle = () => {
+      setSquirrelRunning(true);
+      setSquirrelFrame(1);
+      timeout = setTimeout(() => {
+        setSquirrelRunning(false);
+        setSquirrelFrame(2);
+        timeout = setTimeout(() => {
+          cycle();
+        }, 2500); // pause duration showing squirrel2
+      }, 4000 + Math.random() * 3000); // running duration
+    };
+    cycle();
+    return () => clearTimeout(timeout);
+  }, []);
+
+  // Firebase call tasks sync
+  useEffect(() => {
+    const unsubscribe = onSnapshot(CALLTASKS_DOC, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.tasks) setCallTasks(data.tasks);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Firebase paintings sync
+  useEffect(() => {
+    const unsubscribe = onSnapshot(PAINTINGS_DOC, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.paintings) setPaintings(data.paintings);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   // Firebase status sync
   useEffect(() => {
     const unsubscribe = onSnapshot(STATUS_DOC, (snap) => {
@@ -154,9 +211,31 @@ export default function DollhouseApp() {
     await setDoc(DASHBOARD_DOC, updates, { merge: true });
   };
 
-  const CALLTASKS_DOC = doc(db, 'dashboard', 'calltasks');
   const saveCallTasks = async (tasks) => {
     await setDoc(CALLTASKS_DOC, { tasks }, { merge: true });
+  };
+
+  const savePaintings = async (p) => {
+    await setDoc(PAINTINGS_DOC, { paintings: p }, { merge: true });
+  };
+
+  const addPainting = () => {
+    if (paintings.length >= 20) return;
+    const updated = [...paintings, { id: Date.now(), name: '', done: false, posted: false, tiktok: false }];
+    setPaintings(updated);
+    savePaintings(updated);
+  };
+
+  const handlePaintingChange = (id, field, value) => {
+    const updated = paintings.map(p => p.id === id ? { ...p, [field]: value } : p);
+    setPaintings(updated);
+    savePaintings(updated);
+  };
+
+  const removePainting = (id) => {
+    const updated = paintings.filter(p => p.id !== id);
+    setPaintings(updated);
+    savePaintings(updated);
   };
 
   const handleCallTaskChange = (id, field, value) => {
@@ -180,6 +259,14 @@ export default function DollhouseApp() {
   const [notebookKnocks, setNotebookKnocks] = React.useState(0);
   const [formKnocks, setFormKnocks] = React.useState(0);
   const [isFormDashboardOpen, setIsFormDashboardOpen] = React.useState(false);
+  const [paintingKnocks, setPaintingKnocks] = React.useState(0);
+  const [isPaintingDashboardOpen, setIsPaintingDashboardOpen] = React.useState(false);
+  const triggerAcornExplosion = (e) => {
+    const id = Date.now();
+    setAcornExplosions(prev => [...prev, { id, x: e.clientX, y: e.clientY }]);
+    setTimeout(() => setAcornExplosions(prev => prev.filter(a => a.id !== id)), 900);
+  };
+
   const handleNotebookKnock = () => {
     if (notebookKnocks >= 2) { setIsDashboardOpen(true); setNotebookKnocks(0); }
     else { setNotebookKnocks(prev => prev + 1); setTimeout(() => setNotebookKnocks(0), 1500); }
@@ -236,6 +323,11 @@ export default function DollhouseApp() {
   const handleFormKnock = () => {
     if (formKnocks >= 2) { setIsFormDashboardOpen(true); setFormKnocks(0); }
     else { setFormKnocks(prev => prev + 1); setTimeout(() => setFormKnocks(0), 1500); }
+  };
+
+  const handlePaintingKnock = () => {
+    if (paintingKnocks >= 2) { setIsPaintingDashboardOpen(true); setPaintingKnocks(0); }
+    else { setPaintingKnocks(prev => prev + 1); setTimeout(() => setPaintingKnocks(0), 1500); }
   };
 
   const handlePointerDown = (e, item, type) => {
@@ -385,6 +477,64 @@ export default function DollhouseApp() {
         </div>
       )}
 
+      {/* OWNER: PAINTING DASHBOARD POPUP */}
+      {isPaintingDashboardOpen && (
+        <div onClick={() => setIsPaintingDashboardOpen(false)} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="relative animate-[popIn_0.3s_ease-out_forwards]" onClick={(e) => e.stopPropagation()}>
+            <div className="relative w-80">
+              <img src={PaintingPopupSVG} alt="Painting Tracker" className="w-full h-auto" />
+              <div className="absolute inset-0 flex flex-col pt-14 px-7 pb-6">
+                {/* Summary bar */}
+                <div className="flex justify-between text-[9px] font-black tracking-wide mb-3">
+                  <span className="text-slate-500">{paintings.length} total</span>
+                  <span className="text-[#30797f]">{paintings.filter(p=>p.done).length} done</span>
+                  <span className="text-amber-500">{paintings.filter(p=>p.posted).length} posted</span>
+                  <span className="text-pink-400">{paintings.filter(p=>p.tiktok).length} tiktok</span>
+                </div>
+                {/* Scrollable list */}
+                <div className="flex-1 overflow-y-auto flex flex-col gap-2 pr-1" style={{maxHeight: '320px'}}>
+                  {paintings.map(p => (
+                    <div key={p.id} className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="painting name"
+                        value={p.name}
+                        onChange={(e) => handlePaintingChange(p.id, 'name', e.target.value)}
+                        className="flex-1 text-[10px] bg-transparent border-b border-dashed border-slate-300 focus:outline-none focus:border-[#30797f] placeholder:text-slate-300 text-slate-600 pb-0.5"
+                      />
+                      <button
+                        onClick={() => handlePaintingChange(p.id, 'done', !p.done)}
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border transition-all whitespace-nowrap ${p.done ? 'bg-[#30797f] text-white border-[#30797f]' : 'bg-transparent text-slate-400 border-slate-300'}`}
+                      >done</button>
+                      <button
+                        onClick={() => handlePaintingChange(p.id, 'posted', !p.posted)}
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border transition-all whitespace-nowrap ${p.posted ? 'bg-amber-400 text-white border-amber-400' : 'bg-transparent text-slate-400 border-slate-300'}`}
+                      >web</button>
+                      <button
+                        onClick={() => handlePaintingChange(p.id, 'tiktok', !p.tiktok)}
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border transition-all whitespace-nowrap ${p.tiktok ? 'bg-pink-400 text-white border-pink-400' : 'bg-transparent text-slate-400 border-slate-300'}`}
+                      >tt</button>
+                      <button
+                        onClick={() => removePainting(p.id)}
+                        className="text-[10px] text-slate-300 hover:text-red-400 transition-colors font-bold"
+                      >✕</button>
+                    </div>
+                  ))}
+                  {paintings.length < 20 && (
+                    <button
+                      onClick={addPainting}
+                      className="mt-2 text-[10px] font-bold text-[#30797f] border border-dashed border-[#30797f] rounded-full py-1 hover:bg-[#30797f]/10 transition-colors"
+                    >+ add painting</button>
+                  )}
+                </div>
+              </div>
+            </div>
+            <button onClick={() => setIsPaintingDashboardOpen(false)} className="absolute -top-3 -right-3 bg-white rounded-full w-7 h-7 flex items-center justify-center shadow-md text-slate-500 font-bold text-sm hover:scale-110 transition-transform">✕</button>
+            <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-white font-medium text-xs tracking-widest uppercase opacity-80 pointer-events-none">Click anywhere to close</span>
+          </div>
+        </div>
+      )}
+
       {/* WELCOME POPUP */}
       {showPopup && (
         <div onClick={() => setShowPopup(false)} className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -442,6 +592,12 @@ export default function DollhouseApp() {
           {/* PAINTING FLOOR */}
           <div className="w-full relative flex items-end overflow-hidden select-none">
             <img src={PaintingFloorSVG} alt="Painting Floor" className="w-full h-auto block pointer-events-none" />
+            {/* PAINTING WALL — 3 knocks opens painting tracker */}
+            <img
+              src={PaintingWallSVG} alt="Painting Wall"
+              onClick={handlePaintingKnock}
+              className="absolute top-[10%] right-[5%] w-14 z-30 cursor-pointer drop-shadow-sm"
+            />
             {currentStatus === 'painting' && (
               <div className="absolute bottom-[5%] left-[43%] w-[22%] z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite] drop-shadow-md">
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white text-amber-700 text-[10px] font-bold px-3 py-1 rounded-full shadow-md whitespace-nowrap">
@@ -525,6 +681,25 @@ export default function DollhouseApp() {
           {/* DRIVEWAY */}
           <div className="w-full relative flex items-end bg-transparent z-40">
             <img src={DrivewaySVG} alt="Driveway" className="w-full h-auto block" />
+            {/* SQUIRREL */}
+            <div
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const cx = rect.left + rect.width / 2;
+                const cy = rect.top + rect.height / 2;
+                const id = Date.now();
+                setAcornExplosions(prev => [...prev, { id, x: cx, y: cy }]);
+                setTimeout(() => setAcornExplosions(prev => prev.filter(a => a.id !== id)), 900);
+              }}
+              className={`absolute z-40 select-none cursor-pointer ${squirrelRunning ? 'animate-[squirrelRun_4s_linear_infinite]' : 'animate-[squirrelPause_2.5s_ease-in-out_infinite]'}`}
+              style={{ bottom: '45%' }}
+            >
+              <img
+                src={squirrelFrame === 1 ? Squirrel1 : Squirrel2}
+                alt="Squirrel"
+                className={`w-10 h-10 object-contain ${squirrelRunning ? 'animate-[squirrelBob_0.3s_ease-in-out_infinite]' : ''}`}
+              />
+            </div>
             <div className="absolute bottom-[2%] left-4 z-50 flex flex-col items-center">
               <div className={`transition-all duration-300 ${currentStatus === 'out' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'} mb-1`}>
                 <div className="relative bg-white text-amber-700 text-[10px] font-bold px-3 py-1 rounded-full shadow-md whitespace-nowrap z-50">
@@ -539,6 +714,27 @@ export default function DollhouseApp() {
 
         </div>
       </div>
+
+      {/* Acorn explosions */}
+      {acornExplosions.map(ex => (
+        <div key={ex.id} className="fixed pointer-events-none z-[999]" style={{ left: ex.x, top: ex.y }}>
+          {[0, 1, 2].map((i) => {
+            const angle = (i / 3) * 360;
+            const dist = 55 + Math.random() * 25;
+            const dx = Math.cos((angle * Math.PI) / 180) * dist;
+            const dy = Math.sin((angle * Math.PI) / 180) * dist;
+            return (
+              <img
+                key={i}
+                src={AcornSVG}
+                alt="acorn"
+                className="absolute w-8 h-8 animate-[acornBurst_0.9s_ease-out_forwards]"
+                style={{ "--dx": `${dx}px`, "--dy": `${dy}px` }}
+              />
+            );
+          })}
+        </div>
+      ))}
 
       {/* Star explosions */}
       {explosions.map(ex => (
@@ -555,12 +751,28 @@ export default function DollhouseApp() {
 
       {isOwner && (
         <footer className="fixed w-full max-w-sm mx-auto z-50 animate-[popIn_0.3s_ease-out_forwards]" style={{ bottom: isPlaylistOpen ? '104px' : '24px', transition: 'bottom 0.5s ease-in-out' }}>
-          <div className="flex justify-between items-center bg-white/90 backdrop-blur-md p-2 rounded-full shadow-lg border border-slate-200 gap-1 mx-4">
-            {STATUS_BUTTONS.map((btn) => {
+          <div className="flex justify-center items-center bg-[#b89480] px-3 py-2 rounded-2xl shadow-lg gap-1 mx-4">
+            {[
+              { src: Button1, id: 'painting', icon: '🎨' },
+              { src: Button2, id: 'pattern', icon: '✦' },
+              { src: Button3, id: 'call', icon: '🎙️' },
+              { src: Button4, id: 'coffee', icon: '☕' },
+              { src: Button5, id: 'out', icon: '🚙' },
+            ].map((btn) => {
               const isActive = currentStatus === btn.id;
               return (
-                <button key={btn.id} onClick={() => handleStatusChange(btn.id)} className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-1.5 px-1 rounded-xl transition-all cursor-pointer ${isActive ? 'bg-amber-500 text-white font-medium scale-105 shadow-md' : 'bg-transparent hover:bg-slate-100 text-slate-600'}`}>
-                  <span className="text-sm">{btn.icon}</span><span className="text-[9px] font-bold tracking-tight whitespace-nowrap">{btn.label}</span>
+                <button
+                  key={btn.id}
+                  onClick={() => handleStatusChange(btn.id)}
+                  className={`relative flex flex-col items-center justify-center cursor-pointer transition-all duration-150 select-none
+                    ${isActive ? 'scale-100 translate-y-0' : 'scale-75 opacity-70 hover:opacity-90 hover:scale-80'}
+                    active:scale-90 active:translate-y-1`}
+                  style={{ WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <div className="relative w-12 h-12">
+                    <img src={btn.src} alt={btn.id} className="w-full h-full object-contain" />
+                    <span className="absolute inset-0 flex items-center justify-center text-base pointer-events-none" style={{paddingBottom: '8px'}}>{btn.icon}</span>
+                  </div>
                 </button>
               );
             })}
@@ -587,6 +799,33 @@ export default function DollhouseApp() {
         @keyframes starBurst {
           0% { transform: translate(0, 0) scale(1); opacity: 1; }
           100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
+        }
+        @keyframes squirrelRun {
+          0% { left: 5%; transform: scaleX(1) translateY(0px); }
+          10% { left: 15%; transform: scaleX(1) translateY(-30px); }
+          20% { left: 30%; transform: scaleX(1) translateY(0px); }
+          30% { left: 45%; transform: scaleX(1) translateY(-40px); }
+          40% { left: 60%; transform: scaleX(1) translateY(0px); }
+          48% { left: 80%; transform: scaleX(1) translateY(-20px); }
+          50% { left: 80%; transform: scaleX(-1) translateY(0px); }
+          60% { left: 65%; transform: scaleX(-1) translateY(-35px); }
+          70% { left: 50%; transform: scaleX(-1) translateY(0px); }
+          80% { left: 35%; transform: scaleX(-1) translateY(-40px); }
+          90% { left: 20%; transform: scaleX(-1) translateY(0px); }
+          98% { left: 5%; transform: scaleX(-1) translateY(-20px); }
+          100% { left: 5%; transform: scaleX(1) translateY(0px); }
+        }
+        @keyframes squirrelBob {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-4px); }
+        }
+        @keyframes squirrelPause {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-3px); }
+        }
+        @keyframes acornBurst {
+          0% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; }
+          100% { transform: translate(var(--dx), var(--dy)) scale(0.3) rotate(360deg); opacity: 0; }
         }
         input[type='range'] { -webkit-appearance: none; appearance: none; background: #e2e8f0; height: 6px; border-radius: 9999px; }
         input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #30797f; cursor: pointer; }
