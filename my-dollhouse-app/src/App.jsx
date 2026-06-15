@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import SquirrelGame from './SquirrelGame.jsx';
 import './index.css';
 import { db } from './firebase.js';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
@@ -92,9 +93,11 @@ export default function DollhouseApp() {
   const [showPopup, setShowPopup] = useState(true);
 
   const [pigeons, setPigeons] = useState([]);
-  const [squirrelFrame, setSquirrelFrame] = useState(1); // 1 = running, 2 = paused
+  const [squirrelFrame, setSquirrelFrame] = useState(1);
+  const [squirrelPos, setSquirrelPos] = useState({ x: 15, facing: 1 }); // x as % of container
   const [squirrelRunning, setSquirrelRunning] = useState(true);
   const [acornExplosions, setAcornExplosions] = useState([]);
+  const [isGameOpen, setIsGameOpen] = useState(false);
   const [earphonesFrame, setEarphonesFrame] = useState(0);
 
   // Dashboard state
@@ -142,22 +145,55 @@ export default function DollhouseApp() {
     return () => clearTimeout(timeout);
   }, []);
 
-  // Squirrel animation loop: run fast, stop, show squirrel2, back to running
+  // Squirrel animation — JS driven so it freezes in place when paused
   useEffect(() => {
-    let timeout;
-    const cycle = () => {
-      setSquirrelRunning(true);
-      setSquirrelFrame(1);
-      timeout = setTimeout(() => {
-        setSquirrelRunning(false);
-        setSquirrelFrame(2);
-        timeout = setTimeout(() => {
-          cycle();
-        }, 2500); // pause duration showing squirrel2
-      }, 4000 + Math.random() * 3000); // running duration
+    let raf;
+    let running = true;
+    let x = 60;
+    let facing = -1;
+    let speed = 0.08;
+    let pauseTimer = 0;
+    let isPaused = false;
+    let pauseDuration = 0;
+    let elapsed = 0;
+    let last = performance.now();
+
+    const loop = (now) => {
+      const dt = now - last;
+      last = now;
+      elapsed += dt;
+
+      if (isPaused) {
+        pauseTimer += dt;
+        if (pauseTimer >= pauseDuration) {
+          isPaused = false;
+          pauseTimer = 0;
+          running = true;
+          setSquirrelRunning(true);
+          setSquirrelFrame(1);
+        }
+      } else {
+        x += facing * speed * dt;
+        // Bounce at edges — stay right away from car
+        if (x <= 45) { x = 45; facing = 1; setSquirrelPos({ x, facing }); }
+        else if (x >= 82) { x = 82; facing = -1; setSquirrelPos({ x, facing }); }
+        else { setSquirrelPos({ x: Math.round(x * 10) / 10, facing }); }
+
+        // Random pause at random positions
+        if (Math.random() < 0.0008 * dt) {
+          isPaused = true;
+          running = false;
+          pauseDuration = 1500 + Math.random() * 2500;
+          setSquirrelRunning(false);
+          setSquirrelFrame(2);
+        }
+      }
+
+      raf = requestAnimationFrame(loop);
     };
-    cycle();
-    return () => clearTimeout(timeout);
+
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   // Firebase call tasks sync
@@ -596,7 +632,7 @@ export default function DollhouseApp() {
             <img
               src={PaintingWallSVG} alt="Painting Wall"
               onClick={handlePaintingKnock}
-              className="absolute top-[10%] right-[5%] w-14 z-30 cursor-pointer drop-shadow-sm"
+              className="absolute top-[10%] right-[77%] w-12 z-30 cursor-pointer drop-shadow-sm"
             />
             {currentStatus === 'painting' && (
               <div className="absolute bottom-[5%] left-[43%] w-[22%] z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite] drop-shadow-md">
@@ -681,25 +717,21 @@ export default function DollhouseApp() {
           {/* DRIVEWAY */}
           <div className="w-full relative flex items-end bg-transparent z-40">
             <img src={DrivewaySVG} alt="Driveway" className="w-full h-auto block" />
-            {/* SQUIRREL */}
-            <div
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                const cx = rect.left + rect.width / 2;
-                const cy = rect.top + rect.height / 2;
-                const id = Date.now();
-                setAcornExplosions(prev => [...prev, { id, x: cx, y: cy }]);
-                setTimeout(() => setAcornExplosions(prev => prev.filter(a => a.id !== id)), 900);
-              }}
-              className={`absolute z-40 select-none cursor-pointer ${squirrelRunning ? 'animate-[squirrelRun_4s_linear_infinite]' : 'animate-[squirrelPause_2.5s_ease-in-out_infinite]'}`}
-              style={{ bottom: '45%' }}
-            >
-              <img
-                src={squirrelFrame === 1 ? Squirrel1 : Squirrel2}
-                alt="Squirrel"
-                className={`w-10 h-10 object-contain ${squirrelRunning ? 'animate-[squirrelBob_0.3s_ease-in-out_infinite]' : ''}`}
-              />
-            </div>
+            {/* SQUIRREL — click to open acorn game, hidden when game is open */}
+            {!isGameOpen && (
+              <div
+                onClick={(e) => { e.stopPropagation(); setIsGameOpen(true); }}
+                className="absolute z-40 select-none cursor-pointer"
+                style={{ bottom: '45%', left: `${squirrelPos.x}%`, transition: squirrelRunning ? 'left 0.05s linear' : 'none' }}
+              >
+                <img
+                  src={squirrelFrame === 1 ? Squirrel1 : Squirrel2}
+                  alt="Squirrel"
+                  className={`w-10 h-10 object-contain ${squirrelRunning ? 'animate-[squirrelBob_0.25s_ease-in-out_infinite]' : ''}`}
+                  style={{ transform: `scaleX(${squirrelPos.facing})` }}
+                />
+              </div>
+            )}
             <div className="absolute bottom-[2%] left-4 z-50 flex flex-col items-center">
               <div className={`transition-all duration-300 ${currentStatus === 'out' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'} mb-1`}>
                 <div className="relative bg-white text-amber-700 text-[10px] font-bold px-3 py-1 rounded-full shadow-md whitespace-nowrap z-50">
@@ -715,12 +747,15 @@ export default function DollhouseApp() {
         </div>
       </div>
 
+      {/* SQUIRREL MINI GAME */}
+      {isGameOpen && <SquirrelGame onClose={() => setIsGameOpen(false)} />}
+
       {/* Acorn explosions */}
       {acornExplosions.map(ex => (
-        <div key={ex.id} className="fixed pointer-events-none z-[999]" style={{ left: ex.x, top: ex.y }}>
+        <div key={ex.id} className="fixed pointer-events-none z-[999]" style={{ left: ex.x, top: ex.y, transform: 'translate(-50%, -50%)' }}>
           {[0, 1, 2].map((i) => {
-            const angle = (i / 3) * 360;
-            const dist = 55 + Math.random() * 25;
+            const angle = (i / 3) * 360 + 90;
+            const dist = 70;
             const dx = Math.cos((angle * Math.PI) / 180) * dist;
             const dy = Math.sin((angle * Math.PI) / 180) * dist;
             return (
@@ -728,8 +763,8 @@ export default function DollhouseApp() {
                 key={i}
                 src={AcornSVG}
                 alt="acorn"
-                className="absolute w-8 h-8 animate-[acornBurst_0.9s_ease-out_forwards]"
-                style={{ "--dx": `${dx}px`, "--dy": `${dy}px` }}
+                className="absolute w-10 h-10 animate-[acornBurst_0.9s_ease-out_forwards]"
+                style={{ "--dx": `${dx}px`, "--dy": `${dy}px`, left: 0, top: 0 }}
               />
             );
           })}
@@ -765,8 +800,8 @@ export default function DollhouseApp() {
                   key={btn.id}
                   onClick={() => handleStatusChange(btn.id)}
                   className={`relative flex flex-col items-center justify-center cursor-pointer transition-all duration-150 select-none
-                    ${isActive ? 'scale-100 translate-y-0' : 'scale-75 opacity-70 hover:opacity-90 hover:scale-80'}
-                    active:scale-90 active:translate-y-1`}
+                    ${isActive ? 'scale-75 opacity-100 translate-y-1' : 'scale-100 opacity-70 hover:opacity-90'}
+                    active:scale-75 active:translate-y-1`}
                   style={{ WebkitTapHighlightColor: 'transparent' }}
                 >
                   <div className="relative w-12 h-12">
@@ -800,28 +835,9 @@ export default function DollhouseApp() {
           0% { transform: translate(0, 0) scale(1); opacity: 1; }
           100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
         }
-        @keyframes squirrelRun {
-          0% { left: 5%; transform: scaleX(1) translateY(0px); }
-          10% { left: 15%; transform: scaleX(1) translateY(-30px); }
-          20% { left: 30%; transform: scaleX(1) translateY(0px); }
-          30% { left: 45%; transform: scaleX(1) translateY(-40px); }
-          40% { left: 60%; transform: scaleX(1) translateY(0px); }
-          48% { left: 80%; transform: scaleX(1) translateY(-20px); }
-          50% { left: 80%; transform: scaleX(-1) translateY(0px); }
-          60% { left: 65%; transform: scaleX(-1) translateY(-35px); }
-          70% { left: 50%; transform: scaleX(-1) translateY(0px); }
-          80% { left: 35%; transform: scaleX(-1) translateY(-40px); }
-          90% { left: 20%; transform: scaleX(-1) translateY(0px); }
-          98% { left: 5%; transform: scaleX(-1) translateY(-20px); }
-          100% { left: 5%; transform: scaleX(1) translateY(0px); }
-        }
         @keyframes squirrelBob {
           0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-4px); }
-        }
-        @keyframes squirrelPause {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-3px); }
+          50% { transform: translateY(-5px); }
         }
         @keyframes acornBurst {
           0% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; }
