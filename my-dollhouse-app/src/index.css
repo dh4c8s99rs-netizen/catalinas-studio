@@ -15,3 +15,11 @@ img {
 .w-full {
   width: 100% !important;
 }
+@keyframes pigeonBop {
+  0%, 100% { 
+    transform: translateY(0px); 
+  }
+  50% { 
+    transform: translateY(-8px); /* Adjust this number higher if you want a bigger jump! */
+  }
+}

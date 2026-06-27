@@ -51,6 +51,7 @@ import Earphones3 from './assets/earphones3.svg';
 import Cata1 from './assets/cata1.svg';
 import Cata2 from './assets/cata2.svg';
 import Cata3 from './assets/cata3.svg';
+import Cata4 from './assets/cata4.svg';
 
 const STATUS_BUTTONS = [
   { id: 'painting', label: 'Painting', icon: '🎨' },
@@ -71,6 +72,7 @@ const ROOM_TASKS = {
 const STATUS_DOC = doc(db, 'status', 'current');
 const DASHBOARD_DOC = doc(db, 'dashboard', 'patterns');
 const CALLTASKS_DOC = doc(db, 'dashboard', 'calltasks');
+const CALLTODOS_DOC = doc(db, 'dashboard', 'calltodos');
 const PAINTINGS_DOC = doc(db, 'dashboard', 'paintings');
 
 const EARPHONE_FRAMES = [Earphones1, Earphones3, Earphones2, Earphones3];
@@ -94,7 +96,7 @@ export default function DollhouseApp() {
 
   const [pigeons, setPigeons] = useState([]);
   const [squirrelFrame, setSquirrelFrame] = useState(1);
-  const [squirrelPos, setSquirrelPos] = useState({ x: 15, facing: 1 }); // x as % of container
+  const [squirrelPos, setSquirrelPos] = useState({ x: 15, facing: 1 });
   const [squirrelRunning, setSquirrelRunning] = useState(true);
   const [acornExplosions, setAcornExplosions] = useState([]);
   const [isGameOpen, setIsGameOpen] = useState(false);
@@ -121,6 +123,12 @@ export default function DollhouseApp() {
     { id: 5, task: '', invoiceSent: false, invoicePaid: false },
   ]);
 
+  const [callTodos, setCallTodos] = React.useState([
+    { id: 1, text: '', done: false },
+    { id: 2, text: '', done: false },
+    { id: 3, text: '', done: false },
+  ]);
+
   const [books, setBooks] = useState([{ id: 1, src: Book1, x: 0, y: 0 }, { id: 2, src: Book2, x: 0, y: 0 }, { id: 3, src: Book3, x: 0, y: 0 }]);
   const [paintTubes, setPaintTubes] = useState([{ id: 1, src: PaintTube1, x: 0, y: 0 }, { id: 2, src: PaintTube2, x: 0, y: 0 }, { id: 3, src: PaintTube3, x: 0, y: 0 }]);
   const [dragInfo, setDragInfo] = useState({ id: null, type: null, startX: 0, startY: 0, initialX: 0, initialY: 0 });
@@ -145,7 +153,7 @@ export default function DollhouseApp() {
     return () => clearTimeout(timeout);
   }, []);
 
-  // Squirrel animation — JS driven so it freezes in place when paused
+  // Squirrel animation
   useEffect(() => {
     let raf;
     let running = true;
@@ -174,12 +182,10 @@ export default function DollhouseApp() {
         }
       } else {
         x += facing * speed * dt;
-        // Bounce at edges — stay right away from car
         if (x <= 45) { x = 45; facing = 1; setSquirrelPos({ x, facing }); }
         else if (x >= 82) { x = 82; facing = -1; setSquirrelPos({ x, facing }); }
         else { setSquirrelPos({ x: Math.round(x * 10) / 10, facing }); }
 
-        // Random pause at random positions
         if (Math.random() < 0.0008 * dt) {
           isPaused = true;
           running = false;
@@ -202,6 +208,17 @@ export default function DollhouseApp() {
       if (snap.exists()) {
         const data = snap.data();
         if (data.tasks) setCallTasks(data.tasks);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Firebase call todos sync
+  useEffect(() => {
+    const unsubscribe = onSnapshot(CALLTODOS_DOC, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.todos) setCallTodos(data.todos.slice(0, 3));
       }
     });
     return () => unsubscribe();
@@ -251,6 +268,16 @@ export default function DollhouseApp() {
     await setDoc(CALLTASKS_DOC, { tasks }, { merge: true });
   };
 
+  const saveCallTodos = async (todos) => {
+    await setDoc(CALLTODOS_DOC, { todos }, { merge: true });
+  };
+
+  const handleCallTodoChange = (id, field, value) => {
+    const updated = callTodos.map(t => t.id === id ? { ...t, [field]: value } : t);
+    setCallTodos(updated);
+    saveCallTodos(updated);
+  };
+
   const savePaintings = async (p) => {
     await setDoc(PAINTINGS_DOC, { paintings: p }, { merge: true });
   };
@@ -291,12 +318,12 @@ export default function DollhouseApp() {
     else { setSecretKnocks(prev => prev + 1); setTimeout(() => setSecretKnocks(0), 1500); }
   };
 
-  // Separate 3-knock counter for the notebook
   const [notebookKnocks, setNotebookKnocks] = React.useState(0);
   const [formKnocks, setFormKnocks] = React.useState(0);
   const [isFormDashboardOpen, setIsFormDashboardOpen] = React.useState(false);
   const [paintingKnocks, setPaintingKnocks] = React.useState(0);
   const [isPaintingDashboardOpen, setIsPaintingDashboardOpen] = React.useState(false);
+
   const triggerAcornExplosion = (e) => {
     const id = Date.now();
     setAcornExplosions(prev => [...prev, { id, x: e.clientX, y: e.clientY }]);
@@ -398,7 +425,6 @@ export default function DollhouseApp() {
         <div onClick={() => setIsToDoOpen(false)} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm" style={{ cursor: `url(${PencilSVG}) 0 32, auto` }}>
           <div className="relative animate-[popIn_0.3s_ease-out_forwards]" onClick={(e) => e.stopPropagation()}>
             <img src={ToDoListSVG} alt="Large To-Do List" className="w-72 md:w-96 h-auto shadow-2xl drop-shadow-xl" />
-            <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-white font-medium text-xs tracking-widest uppercase opacity-80 pointer-events-none">Click anywhere to close</span>
           </div>
         </div>
       )}
@@ -407,17 +433,10 @@ export default function DollhouseApp() {
       {isDashboardOpen && (
         <div onClick={() => setIsDashboardOpen(false)} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="relative animate-[popIn_0.3s_ease-out_forwards]" onClick={(e) => e.stopPropagation()}>
-
-            {/* Notebook background */}
             <div className="relative w-80">
               <img src={ToDoListEmptySVG} alt="Notebook" className="w-full h-auto" />
-
-              {/* Dashboard content overlaid on notebook */}
               <div className="absolute inset-0 flex flex-col justify-start pt-16 px-8 pb-6 gap-5">
-
                 <p className="text-center text-[11px] font-black tracking-widest uppercase text-[#30797f] mb-1">✦ pattern studio ✦</p>
-
-                {/* Collections */}
                 <div>
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-[11px] font-bold text-slate-600">brainstorm collections</span>
@@ -429,8 +448,6 @@ export default function DollhouseApp() {
                     className="w-full h-2 rounded-full accent-[#30797f] cursor-pointer"
                   />
                 </div>
-
-                {/* Portfolio */}
                 <div>
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-[11px] font-bold text-slate-600">update portfolio</span>
@@ -442,8 +459,6 @@ export default function DollhouseApp() {
                     className="w-full h-2 rounded-full accent-[#30797f] cursor-pointer"
                   />
                 </div>
-
-                {/* Pitches */}
                 <div>
                   <p className="text-[11px] font-bold text-slate-600 mb-2">pitch to clients</p>
                   <div className="flex flex-col gap-1.5">
@@ -468,12 +483,9 @@ export default function DollhouseApp() {
                     ))}
                   </div>
                 </div>
-
               </div>
             </div>
-
             <button onClick={() => setIsDashboardOpen(false)} className="absolute -top-3 -right-3 bg-white rounded-full w-7 h-7 flex items-center justify-center shadow-md text-slate-500 font-bold text-sm hover:scale-110 transition-transform">✕</button>
-            <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-white font-medium text-xs tracking-widest uppercase opacity-80 pointer-events-none">Click anywhere to close</span>
           </div>
         </div>
       )}
@@ -505,10 +517,25 @@ export default function DollhouseApp() {
                     >paid</button>
                   </div>
                 ))}
+                <p className="text-center text-[11px] font-black tracking-widest uppercase text-white/80 mt-2 mb-1">✦ to do ✦</p>
+                {callTodos.map(t => (
+                  <div key={t.id} className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleCallTodoChange(t.id, 'done', !t.done)}
+                      className={`w-3.5 h-3.5 rounded-sm border flex-shrink-0 transition-all ${t.done ? 'bg-white border-white' : 'bg-transparent border-white/50'}`}
+                    />
+                    <input
+                      type="text"
+                      placeholder={`to do ${t.id}`}
+                      value={t.text}
+                      onChange={(e) => handleCallTodoChange(t.id, 'text', e.target.value)}
+                      className={`flex-1 text-[10px] bg-transparent border-b border-dashed border-white/50 focus:outline-none focus:border-white placeholder:text-white/40 pb-0.5 transition-all ${t.done ? 'line-through text-white/40' : 'text-white'}`}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
             <button onClick={() => setIsFormDashboardOpen(false)} className="absolute -top-3 -right-3 bg-white rounded-full w-7 h-7 flex items-center justify-center shadow-md text-slate-500 font-bold text-sm hover:scale-110 transition-transform">✕</button>
-            <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-white font-medium text-xs tracking-widest uppercase opacity-80 pointer-events-none">Click anywhere to close</span>
           </div>
         </div>
       )}
@@ -520,14 +547,12 @@ export default function DollhouseApp() {
             <div className="relative w-80">
               <img src={PaintingPopupSVG} alt="Painting Tracker" className="w-full h-auto" />
               <div className="absolute inset-0 flex flex-col pt-14 px-7 pb-6">
-                {/* Summary bar */}
                 <div className="flex justify-between text-[9px] font-black tracking-wide mb-3">
                   <span className="text-slate-500">{paintings.length} total</span>
                   <span className="text-[#30797f]">{paintings.filter(p=>p.done).length} done</span>
                   <span className="text-amber-500">{paintings.filter(p=>p.posted).length} posted</span>
                   <span className="text-pink-400">{paintings.filter(p=>p.tiktok).length} tiktok</span>
                 </div>
-                {/* Scrollable list */}
                 <div className="flex-1 overflow-y-auto flex flex-col gap-2 pr-1" style={{maxHeight: '320px'}}>
                   {paintings.map(p => (
                     <div key={p.id} className="flex items-center gap-1.5">
@@ -566,7 +591,6 @@ export default function DollhouseApp() {
               </div>
             </div>
             <button onClick={() => setIsPaintingDashboardOpen(false)} className="absolute -top-3 -right-3 bg-white rounded-full w-7 h-7 flex items-center justify-center shadow-md text-slate-500 font-bold text-sm hover:scale-110 transition-transform">✕</button>
-            <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-white font-medium text-xs tracking-widest uppercase opacity-80 pointer-events-none">Click anywhere to close</span>
           </div>
         </div>
       )}
@@ -615,6 +639,11 @@ export default function DollhouseApp() {
           {/* ROOF */}
           <div className="w-full relative flex items-end">
             <img src={RoofSVG} alt="Studio Roof" className="w-full h-auto block" />
+            {currentStatus === 'coffee' && (
+              <div className="absolute -top-[3%] right-[8%] w-[28%] z-[55] pointer-events-none animate-[bob_3s_ease-in-out_infinite]">
+                <img src={Cata4} alt="Cata Relaxing" className="w-full h-auto block" />
+              </div>
+            )}
             <div onClick={triggerPigeonFlight} className="absolute bottom-[40%] w-8 h-8 z-40 select-none cursor-pointer hover:scale-110 animate-[pigeonWalk_17s_linear_infinite,pigeonBob_0.3s_ease-in-out_infinite]">
               <img src={PigeonSVG} alt="Pigeon Vector" className="w-full h-full object-contain" />
             </div>
@@ -628,14 +657,13 @@ export default function DollhouseApp() {
           {/* PAINTING FLOOR */}
           <div className="w-full relative flex items-end overflow-hidden select-none">
             <img src={PaintingFloorSVG} alt="Painting Floor" className="w-full h-auto block pointer-events-none" />
-            {/* PAINTING WALL — 3 knocks opens painting tracker */}
             <img
               src={PaintingWallSVG} alt="Painting Wall"
               onClick={handlePaintingKnock}
               className="absolute top-[10%] right-[77%] w-12 z-30 cursor-pointer drop-shadow-sm"
             />
             {currentStatus === 'painting' && (
-              <div className="absolute bottom-[5%] left-[43%] w-[22%] z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite] drop-shadow-md">
+              <div className="absolute bottom-[5%] left-[43%] w-[22%] z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite]">
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white text-amber-700 text-[10px] font-bold px-3 py-1 rounded-full shadow-md whitespace-nowrap">
                   {customTaskText}<div className="w-2 h-2 bg-white transform rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2"></div>
                 </div>
@@ -663,15 +691,14 @@ export default function DollhouseApp() {
           {/* PATTERN FLOOR */}
           <div className="w-full relative flex items-end select-none">
             <img src={PatternFloorSVG} alt="Pattern Design Floor" className="w-full h-auto block pointer-events-none" />
-            {(currentStatus === 'pattern' || currentStatus === 'coffee') && (
-              <div className={`absolute bottom-[10%] ${currentStatus === 'coffee' ? 'left-[58%]' : 'left-[62%]'} w-[26%] z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite] drop-shadow-md transition-all duration-500`}>
+            {currentStatus === 'pattern' && (
+              <div className="absolute bottom-[10%] left-[62%] w-[26%] z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite] transition-all duration-500">
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white text-amber-700 text-[10px] font-bold px-3 py-1 rounded-full shadow-md whitespace-nowrap">
                   {customTaskText}<div className="w-2 h-2 bg-white transform rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2"></div>
                 </div>
                 <img src={Cata2} alt="Cata Pattern" className="w-full h-auto block" />
               </div>
             )}
-            {/* NOTEBOOK — prop for visitors, dashboard for owner */}
             <img
               src={ToDoListSVG} alt="Notebook"
               onClick={handleNotebookKnock}
@@ -690,14 +717,13 @@ export default function DollhouseApp() {
           {/* CALL FLOOR */}
           <div className="w-full relative flex items-end overflow-hidden select-none">
             <img src={CallFloorSVG} alt="Live Call Floor" className="w-full h-auto block pointer-events-none" />
-            {/* FORM on wall — 3 knocks opens invoice dashboard */}
             <img
               src={FormWallSVG} alt="Form"
               onClick={handleFormKnock}
               className="absolute top-[17%] left-[25%] w-14 z-30 cursor-pointer drop-shadow-sm"
             />
             {currentStatus === 'call' && (
-              <div className="absolute bottom-[10%] left-[51%] w-[22%] z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite] drop-shadow-md">
+              <div className="absolute bottom-[10%] left-[51%] w-[22%] z-20 pointer-events-none animate-[bob_3s_ease-in-out_infinite]">
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white text-amber-700 text-[10px] font-bold px-3 py-1 rounded-full shadow-md whitespace-nowrap">
                   {customTaskText}<div className="w-2 h-2 bg-white transform rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2"></div>
                 </div>
@@ -717,7 +743,6 @@ export default function DollhouseApp() {
           {/* DRIVEWAY */}
           <div className="w-full relative flex items-end bg-transparent z-40">
             <img src={DrivewaySVG} alt="Driveway" className="w-full h-auto block" />
-            {/* SQUIRREL — click to open acorn game, hidden when game is open */}
             {!isGameOpen && (
               <div
                 onClick={(e) => { e.stopPropagation(); setIsGameOpen(true); }}
