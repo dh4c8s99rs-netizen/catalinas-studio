@@ -724,13 +724,13 @@ export default function DollhouseApp() {
       {isCity && (
         <div className="w-full max-w-[420px] relative">
           <img src={CitySVG} alt="City" className="w-full h-auto block" />
-          <div className="absolute bottom-[32%] right-[27%] z-10">
+          <div className="absolute bottom-[27%] right-[45%] z-10">
             <div className="relative bg-white text-amber-700 text-[10px] font-bold px-3 py-1 rounded-full shadow-md whitespace-nowrap mb-1">
               {customTaskText}<div className="w-2 h-2 bg-white transform rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2"></div>
             </div>
           </div>
-          <div className="absolute bottom-[17%] right-[16%] z-10 animate-[bumpy_0.4s_ease-in-out_infinite]">
-            <img src={CarSVG} alt="Mini Car" className="h-16 w-auto object-contain block" style={{ transform: 'scaleX(-1)' }} />
+          <div className="absolute bottom-[15%] right-[36%] z-10 animate-[bumpy_0.4s_ease-in-out_infinite]">
+            <img src={CarSVG} alt="Mini Car" className="h-14 w-auto object-contain block" style={{ transform: 'scaleX(1)' }} />
           </div>
         </div>
       )}
