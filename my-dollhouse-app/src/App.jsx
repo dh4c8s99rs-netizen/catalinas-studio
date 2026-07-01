@@ -24,6 +24,9 @@ import PaintTube3 from './assets/paint-tube3.svg';
 import PopupSVG from './assets/popup.svg';
 import KingslandSVG from './assets/kingsland.svg';
 import CitySVG from './assets/city.svg';
+import RoadCar1SVG from './assets/car2.svg';
+import RoadCar2SVG from './assets/car3.svg';
+import RoadCar3SVG from './assets/car4.svg';
 
 // --- INTERACTIVE ASSET IMPORTS ---
 import ToDoListSVG from './assets/to-do-list.svg';
@@ -74,6 +77,8 @@ const PAINTINGS_DOC = doc(db, 'dashboard', 'paintings');
 const EARPHONE_FRAMES = [Earphones1, Earphones3, Earphones2, Earphones3];
 const EARPHONE_DELAYS = [3000, 200, 200, 200];
 
+const ROAD_CARS = [RoadCar1SVG, RoadCar2SVG, RoadCar3SVG];
+
 const COLLECTIONS_TARGET = 12;
 
 export default function DollhouseApp() {
@@ -91,6 +96,7 @@ export default function DollhouseApp() {
   const [showPopup, setShowPopup] = useState(true);
 
   const [pigeons, setPigeons] = useState([]);
+  const [roadCars, setRoadCars] = useState([]);
   const [squirrelFrame, setSquirrelFrame] = useState(1);
   const [squirrelPos, setSquirrelPos] = useState({ x: 15, facing: 1 });
   const [squirrelRunning, setSquirrelRunning] = useState(true);
@@ -222,6 +228,33 @@ export default function DollhouseApp() {
     });
     return () => unsubscribe();
   }, []);
+
+  // --- ROAD TRAFFIC: periodic background cars driving past on the Kingsland block ---
+  useEffect(() => {
+    const isAwayNow = currentStatus === 'out' || currentStatus === 'city';
+    if (!isAwayNow) { setRoadCars([]); return; }
+
+    let spawnTimeoutId;
+    let cleared = false;
+
+    const spawnCar = () => {
+      const id = Date.now() + Math.random();
+      const src = ROAD_CARS[Math.floor(Math.random() * ROAD_CARS.length)];
+      const direction = Math.random() < 0.5 ? 'ltr' : 'rtl';
+      const duration = 4 + Math.random() * 2; // 4-6s crossing time
+
+      setRoadCars(prev => [...prev, { id, src, direction, duration }]);
+      setTimeout(() => {
+        if (!cleared) setRoadCars(prev => prev.filter(c => c.id !== id));
+      }, duration * 1000 + 100);
+
+      const nextDelay = 10000 + Math.random() * 15000; // next car in 10-25s
+      spawnTimeoutId = setTimeout(spawnCar, nextDelay);
+    };
+
+    spawnTimeoutId = setTimeout(spawnCar, 3000 + Math.random() * 5000); // first car in 3-8s
+    return () => { cleared = true; clearTimeout(spawnTimeoutId); };
+  }, [currentStatus]);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(DASHBOARD_DOC, (snap) => {
@@ -656,15 +689,31 @@ export default function DollhouseApp() {
       {isAway && (
         <div className="w-full max-w-[420px] relative -mt-16">
           <img src={KingslandSVG} alt="Kingsland" className="w-full h-auto block" />
+
+          {/* ROAD TRAFFIC — periodic passing cars, clipped to this block so they never escape it */}
+          <div className="absolute bottom-[5.5%] left-0 w-full h-[16%] overflow-hidden pointer-events-none z-[5]">
+            {roadCars.map(car => (
+              <img
+                key={car.id}
+                src={car.src}
+                alt="Passing car"
+                className="absolute bottom-0 h-full w-auto object-contain"
+                style={{
+                  animation: `${car.direction === 'ltr' ? 'roadCarLTR' : 'roadCarRTL'} ${car.duration}s linear forwards`,
+                }}
+              />
+            ))}
+          </div>
+
           {isOut && (
             <>
-              <div className="absolute bottom-[15%] left-[10%] z-10">
+              <div className="absolute bottom-[19%] left-[17%] z-10">
                 <div className="relative bg-white text-amber-700 text-[10px] font-bold px-3 py-1 rounded-full shadow-md whitespace-nowrap mb-1">
                   {customTaskText}<div className="w-2 h-2 bg-white transform rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2"></div>
                 </div>
               </div>
               <div className="absolute bottom-[4%] left-[4%] z-10 animate-[bumpy_0.4s_ease-in-out_infinite]">
-                <img src={CarSVG} alt="Mini Car" className="h-16 w-auto object-contain block" />
+                <img src={CarSVG} alt="Mini Car" className="h-20 w-auto object-contain block" />
               </div>
             </>
           )}
@@ -748,6 +797,14 @@ export default function DollhouseApp() {
         @keyframes wiggle { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
         @keyframes bob { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-6px); } }
         @keyframes bumpy { 0%, 100% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(-3px) rotate(-1deg); } }
+        @keyframes roadCarLTR {
+          0% { left: -60%; transform: scaleX(1); }
+          100% { left: 160%; transform: scaleX(1); }
+        }
+        @keyframes roadCarRTL {
+          0% { left: 160%; transform: scaleX(-1); }
+          100% { left: -60%; transform: scaleX(-1); }
+        }
         @keyframes drive {
           0% { transform: translateX(0px) scaleX(1); }
           49% { transform: translateX(280px) scaleX(1); }
